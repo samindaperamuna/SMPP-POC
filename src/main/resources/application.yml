@@ -1,0 +1,33 @@
+spring:
+  jmx:
+    enabled: false
+  main:
+    web-application-type: none
+
+smpp:
+  mo:
+    host: 172.20.0.2
+    port: 9550
+    systemId: smpp_user
+    password: smpp123
+    systemType: cp
+    bind-timeout: 5000
+    enquire-link-timer: 40
+    transaction-timer: 60000
+    charset: UTF-8
+  mt:
+    host: 172.20.0.2
+    port: 9550
+    systemId: abc
+    password: xxx
+    systemType: cp
+    bind-timeout: 5000
+    charset: UTF-8
+
+logging:
+  level:
+    org.springframework: info
+    org.jsmpp: info
+    org.jsmpp.session.SMPPSession: info
+    org.jsmpp.session.SMPPServerSession: info
+    org.jsmpp.sample.springboot: info
