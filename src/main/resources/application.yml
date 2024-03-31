@@ -11,7 +11,7 @@ spring:
     password: password
 
 rabbitmq:
-  exchange.name: smpp.direct
+  exchange.name: smpp.topic
   mo:
     queue.name: smpp.inbound
     routing.key: smpp_direct_to_inbound
@@ -38,6 +38,7 @@ smpp:
     systemType: cp
     bind-timeout: 5000
     enquire-link-timer: 40
+    transaction-timer: 60000
     charset: UTF-8
 
 logging:

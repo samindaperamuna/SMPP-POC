@@ -1,6 +1,5 @@
 package org.fifthgen.smpp.proxy;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fifthgen.smpp.config.ConnectionProperties;
 import org.fifthgen.smpp.config.SMPPMOClientConfig;
@@ -11,14 +10,14 @@ import org.jsmpp.bean.*;
 import org.jsmpp.extra.NegativeResponseException;
 import org.jsmpp.extra.ResponseTimeoutException;
 import org.jsmpp.session.BindParameter;
+import org.jsmpp.util.InvalidDeliveryReceiptException;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 
 @Slf4j
-@RequiredArgsConstructor
 @Service
 public class SMPPProxyServer {
 
@@ -26,13 +25,43 @@ public class SMPPProxyServer {
 
     private final SMPPMOClientConfig moConfig;
     private final MessageReceiverListenerMO moReceiverListener;
-    private final SessionStateListenerMO moSessionListener;
+    private SessionStateListenerMO moSessionListener;
     private SMPPSessionMO moSession;
 
     private final SMPPMTClientConfig mtConfig;
     private final MessageReceiverListenerMT mtReceiverListener;
-    private final SessionStateListenerMT mtSessionListener;
+    private SessionStateListenerMT mtSessionListener;
     private SMPPSessionMT mtSession;
+
+    @Autowired
+    public SMPPProxyServer(
+            SMPPMOClientConfig moConfig,
+            MessageReceiverListenerMO moReceiverListener,
+            SMPPMTClientConfig mtConfig,
+            MessageReceiverListenerMT mtReceiverListener
+    ) {
+        this.moConfig = moConfig;
+        this.moReceiverListener = moReceiverListener;
+        this.moSession = new SMPPSessionMO(new ConnectionProperties());
+        this.moSessionListener = new SessionStateListenerMO(this, moConfig.getTransactionTimer());
+
+        moSession.setMessageReceiverListener(moReceiverListener);
+        moSession.addSessionStateListener(moSessionListener);
+        moSession.setEnquireLinkTimer(moConfig.getEnquireLinkTimer());
+
+        log.debug("SMPP MO session with id {} started on port {}", moSession.getId(), moConfig.getPort());
+
+        this.mtConfig = mtConfig;
+        this.mtReceiverListener = mtReceiverListener;
+        this.mtSession = new SMPPSessionMT(new ConnectionProperties());
+        this.mtSessionListener = new SessionStateListenerMT(this, moConfig.getTransactionTimer());
+
+        mtSession.setMessageReceiverListener(mtReceiverListener);
+        mtSession.addSessionStateListener(mtSessionListener);
+        mtSession.setEnquireLinkTimer(mtConfig.getEnquireLinkTimer());
+
+        log.debug("SMPP MT session with id {} started on port {}", mtSession.getId(), mtConfig.getPort());
+    }
 
     public void start() {
         startMOSession();
@@ -57,14 +86,7 @@ public class SMPPProxyServer {
         }
     }
 
-    private void startMOSession() {
-        this.moSession = new SMPPSessionMO(new ConnectionProperties());
-        moSession.setMessageReceiverListener(moReceiverListener);
-        moSession.addSessionStateListener(moSessionListener);
-        moSession.setEnquireLinkTimer(moConfig.getEnquireLinkTimer());
-
-        log.debug("SMPP MO session with id {} started on port {}", moSession.getId(), moConfig.getPort());
-
+    public void startMOSession() {
         try {
             log.info("Connecting to SMPP MO session with id {} on task {}", moSession.getId(), Thread.currentThread().getName());
 
@@ -91,14 +113,7 @@ public class SMPPProxyServer {
         }
     }
 
-    private void startMTSession() {
-        this.mtSession = new SMPPSessionMT(new ConnectionProperties());
-        mtSession.setMessageReceiverListener(mtReceiverListener);
-        mtSession.addSessionStateListener(mtSessionListener);
-        mtSession.setEnquireLinkTimer(mtConfig.getEnquireLinkTimer());
-
-        log.debug("SMPP MT session with id {} started on port {}", mtSession.getId(), mtConfig.getPort());
-
+    public void startMTSession() {
         try {
             log.info("Connecting to SMPP MT session with id {} on task {}", mtSession.getId(), Thread.currentThread().getName());
 
@@ -120,8 +135,6 @@ public class SMPPProxyServer {
                     systemId,
                     Thread.currentThread().getName()
             );
-
-            // Send an initial message to get the connection going
         } catch (IOException e) {
             log.error("Failed connect and bind to host {}:{}: {}", mtConfig.getHost(), mtConfig.getPort(), e.getMessage());
         }
@@ -131,6 +144,8 @@ public class SMPPProxyServer {
     private void consumeOutboundQueue(DeliverSm message) {
         if (mtSession != null) {
             SubmitSmResp submitSmResp = submitMessage(mtSession, message);
+
+            log.info("Consumed message from outbound queue");
         }
     }
 
@@ -138,6 +153,8 @@ public class SMPPProxyServer {
     private void consumeInboundQueue(DeliverSm message) {
         if (moSession != null) {
             SubmitSmResp submitSmResp = submitMessage(moSession, message);
+
+            log.info("Consumed message from inbound queue");
         }
     }
 
