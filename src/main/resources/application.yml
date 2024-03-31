@@ -4,12 +4,27 @@ spring:
   main:
     web-application-type: none
 
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: admin
+    password: password
+
+rabbitmq:
+  exchange.name: smpp.direct
+  mo:
+    queue.name: smpp.inbound
+    routing.key: smpp_direct_to_inbound
+  mt:
+    queue.name: smpp.outbound
+    routing.key: smpp_direct_to_outbound
+
 smpp:
   mo:
     host: 172.20.0.2
     port: 9550
-    systemId: smpp_user
-    password: smpp123
+    systemId: smpp_mo
+    password: mo123
     systemType: cp
     bind-timeout: 5000
     enquire-link-timer: 40
@@ -18,10 +33,11 @@ smpp:
   mt:
     host: 172.20.0.2
     port: 9550
-    systemId: abc
-    password: xxx
+    systemId: smpp_mt
+    password: mt123
     systemType: cp
     bind-timeout: 5000
+    enquire-link-timer: 40
     charset: UTF-8
 
 logging:
